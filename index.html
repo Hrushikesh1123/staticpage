@@ -18,7 +18,6 @@
   <textarea id="jsonOutput" rows="20" readonly placeholder="JSON output will appear here"></textarea>
 
   <script>
-    // Use your provided XSLT content
     const REMOVE_NS_XSLT_CONTENT = `<?xml version="1.0" encoding="utf-8"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
   <xsl:output method="xml" indent="yes" />
@@ -104,7 +103,7 @@
       }
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(newXML, "text/xml");
-      const jsObj = xmlToJson(xmlDoc);
+      const jsObj = xmlToJson(xmlDoc.documentElement);
       return JSON.stringify(jsObj, null, 2);
     }
 
