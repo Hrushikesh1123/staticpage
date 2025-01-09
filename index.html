@@ -12,31 +12,27 @@
 <body>
   <h1>XML to JSON Converter</h1>
   <p>Paste your XML below:</p>
-  <textarea id="xmlInput" rows="10" placeholder="Paste your XML here"></textarea><br>
+  <textarea id="xmlInput" rows="15" placeholder="Paste your XML here"></textarea><br>
   <button onclick="process()">Convert</button>
   <h2>JSON Output:</h2>
-  <textarea id="jsonOutput" rows="10" readonly placeholder="JSON output will appear here"></textarea>
+  <textarea id="jsonOutput" rows="20" readonly placeholder="JSON output will appear here"></textarea>
 
   <script>
-    // XSLT content to remove XML namespaces
-    const REMOVE_NS_XSLT_CONTENT = `<?xml version="1.0" encoding="UTF-8"?>
-      <xsl:stylesheet version="1.0" 
-        xmlns:xsl="http://www.w3.org/1999/XSL/Transform" 
-        exclude-result-prefixes="xsl">
-        <xsl:template match="*">
-          <xsl:element name="{local-name()}">
-            <xsl:apply-templates select="@* | node()"/>
-          </xsl:element>
-        </xsl:template>
-        <xsl:template match="@*">
-          <xsl:attribute name="{local-name()}">
-            <xsl:value-of select="."/>
-          </xsl:attribute>
-        </xsl:template>
-        <xsl:template match="text() | comment() | processing-instruction()">
-          <xsl:copy/>
-        </xsl:template>
-      </xsl:stylesheet>`;
+    // Use your provided XSLT content
+    const REMOVE_NS_XSLT_CONTENT = `<?xml version="1.0" encoding="utf-8"?>
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:output method="xml" indent="yes" />
+  <xsl:template match="*">
+      <xsl:element name="{local-name(.)}">
+          <xsl:apply-templates select="@* | node()" />
+      </xsl:element>
+  </xsl:template>
+  <xsl:template match="@*">
+      <xsl:attribute name="{local-name(.)}">
+        <xsl:value-of select="." />
+      </xsl:attribute>
+  </xsl:template>
+</xsl:stylesheet>`;
 
     function removeXMLNameSpace(xmlData) {
       try {
@@ -54,45 +50,50 @@
       return xmlData;
     }
 
-    function xmlToJson(xml) {
-      // Convert an XML DOM to a JavaScript object.
+    function xmlToJson(node) {
+      if (node.nodeType === 3) { // Text node
+        const text = node.nodeValue.trim();
+        return text ? text : null;
+      }
+      if (node.nodeType !== 1) return null; // Non-element nodes
+
       let obj = {};
 
-      if (xml.nodeType === 1) { // Element node
-        // Process attributes
-        if (xml.attributes.length > 0) {
-          obj["@attributes"] = {};
-          for (let j = 0; j < xml.attributes.length; j++) {
-            const attribute = xml.attributes.item(j);
-            obj["@attributes"][attribute.nodeName] = attribute.nodeValue;
-          }
-        }
-      } else if (xml.nodeType === 3) { // Text node
-        return xml.nodeValue;
-      }
-
-      // Process child nodes
-      if (xml.hasChildNodes()) {
-        for (let i = 0; i < xml.childNodes.length; i++) {
-          const item = xml.childNodes.item(i);
-          const nodeName = item.nodeName;
-          const childObj = xmlToJson(item);
-          // Skip empty text nodes (like newlines)
-          if (typeof childObj === 'string' && childObj.trim() === "") {
-            continue;
-          }
-
-          if (typeof(obj[nodeName]) === "undefined") {
-            obj[nodeName] = childObj;
-          } else {
-            // Convert to array if multiple children of same name
-            if (!Array.isArray(obj[nodeName])) {
-              obj[nodeName] = [obj[nodeName]];
-            }
-            obj[nodeName].push(childObj);
-          }
+      // Copy attributes
+      if (node.attributes && node.attributes.length > 0) {
+        for (let i = 0; i < node.attributes.length; i++) {
+          const attr = node.attributes.item(i);
+          obj[attr.nodeName] = attr.nodeValue;
         }
       }
+
+      const children = Array.from(node.childNodes).filter(n => 
+        (n.nodeType === 1) || (n.nodeType === 3 && n.nodeValue.trim() !== "")
+      );
+
+      // If there's only one text child, store it as content
+      if (children.length === 1 && children[0].nodeType === 3) {
+        obj.content = children[0].nodeValue.trim();
+        return obj;
+      }
+
+      // Process child elements
+      children.forEach(child => {
+        if (child.nodeType === 3) return;
+        const childName = child.nodeName;
+        const childJson = xmlToJson(child);
+        if (childJson === null) return;
+
+        if (obj.hasOwnProperty(childName)) {
+          if (!Array.isArray(obj[childName])) {
+            obj[childName] = [obj[childName]];
+          }
+          obj[childName].push(childJson);
+        } else {
+          obj[childName] = childJson;
+        }
+      });
+
       return obj;
     }
 
@@ -104,8 +105,7 @@
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(newXML, "text/xml");
       const jsObj = xmlToJson(xmlDoc);
-      const jsonString = JSON.stringify(jsObj, null, 2);
-      return jsonString;
+      return JSON.stringify(jsObj, null, 2);
     }
 
     function process() {
