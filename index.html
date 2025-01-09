@@ -1,117 +1,269 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>XML to JSON Converter</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    textarea { width: 100%; }
-    button { padding: 10px 20px; margin-top: 10px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XML to JSON Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.5;
+            padding: 2rem;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-bottom: 2rem;
+            color: #2d3748;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+            font-weight: 500;
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            resize: vertical;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .convert-btn {
+            background-color: #3182ce;
+            color: white;
+        }
+
+        .convert-btn:hover {
+            background-color: #2c5282;
+        }
+
+        .clear-btn {
+            background-color: #718096;
+            color: white;
+        }
+
+        .clear-btn:hover {
+            background-color: #4a5568;
+        }
+
+        .error {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background-color: #fed7d7;
+            border: 1px solid #f56565;
+            border-radius: 6px;
+            color: #c53030;
+            display: none;
+        }
+
+        pre {
+            background-color: #f7fafc;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            overflow: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
 </head>
 <body>
-  <h1>XML to JSON Converter</h1>
-  <p>Paste your XML below:</p>
-  <textarea id="xmlInput" rows="15" placeholder="Paste your XML here"></textarea><br>
-  <button onclick="process()">Convert</button>
-  <h2>JSON Output:</h2>
-  <textarea id="jsonOutput" rows="20" readonly placeholder="JSON output will appear here"></textarea>
+    <div class="container">
+        <h1>XML to JSON Converter</h1>
+        
+        <div class="error" id="error"></div>
 
-  <script>
-    const REMOVE_NS_XSLT_CONTENT = `<?xml version="1.0" encoding="utf-8"?>
-<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-  <xsl:output method="xml" indent="yes" />
-  <xsl:template match="*">
-      <xsl:element name="{local-name(.)}">
-          <xsl:apply-templates select="@* | node()" />
-      </xsl:element>
-  </xsl:template>
-  <xsl:template match="@*">
-      <xsl:attribute name="{local-name(.)}">
-        <xsl:value-of select="." />
-      </xsl:attribute>
-  </xsl:template>
-</xsl:stylesheet>`;
+        <div class="form-group">
+            <label for="xmlInput">Input XML:</label>
+            <textarea id="xmlInput" placeholder="Paste your XML here..."></textarea>
+        </div>
 
-    function removeXMLNameSpace(xmlData) {
-      try {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlData, "text/xml");
-        const xsltProcessor = new XSLTProcessor();
-        const xsltDoc = parser.parseFromString(REMOVE_NS_XSLT_CONTENT, "text/xml");
-        xsltProcessor.importStylesheet(xsltDoc);
-        const resultDoc = xsltProcessor.transformToDocument(xmlDoc);
-        const serializer = new XMLSerializer();
-        return serializer.serializeToString(resultDoc);
-      } catch (e) {
-        console.error(e);
-      }
-      return xmlData;
-    }
+        <div class="button-group">
+            <button class="convert-btn" onclick="convertToJSON()">Convert to JSON</button>
+            <button class="clear-btn" onclick="clearAll()">Clear</button>
+        </div>
 
-    function xmlToJson(node) {
-      if (node.nodeType === 3) { // Text node
-        const text = node.nodeValue.trim();
-        return text ? text : null;
-      }
-      if (node.nodeType !== 1) return null; // Non-element nodes
+        <div class="form-group" id="outputContainer" style="display: none;">
+            <label for="jsonOutput">Output JSON:</label>
+            <pre id="jsonOutput"></pre>
+        </div>
+    </div>
 
-      let obj = {};
-
-      // Copy attributes
-      if (node.attributes && node.attributes.length > 0) {
-        for (let i = 0; i < node.attributes.length; i++) {
-          const attr = node.attributes.item(i);
-          obj[attr.nodeName] = attr.nodeValue;
+    <script>
+        function removeNamespaces(xmlString) {
+            if (!xmlString.trim().toLowerCase().startsWith('<?xml')) {
+                xmlString = '<?xml version="1.0" encoding="UTF-8"?>' + xmlString;
+            }
+            return xmlString.replace(/\s+xmlns(:[a-z0-9]+)?="[^"]*"/g, '')
+                           .replace(/[a-z0-9]+:/g, '');
         }
-      }
 
-      const children = Array.from(node.childNodes).filter(n => 
-        (n.nodeType === 1) || (n.nodeType === 3 && n.nodeValue.trim() !== "")
-      );
+        function xmlToJson(node) {
+            if (node.nodeType === 3) { // text node
+                return node.nodeValue.trim();
+            }
 
-      // If there's only one text child, store it as content
-      if (children.length === 1 && children[0].nodeType === 3) {
-        obj.content = children[0].nodeValue.trim();
-        return obj;
-      }
+            let obj = {};
 
-      // Process child elements
-      children.forEach(child => {
-        if (child.nodeType === 3) return;
-        const childName = child.nodeName;
-        const childJson = xmlToJson(child);
-        if (childJson === null) return;
+            // Handle attributes
+            Array.from(node.attributes || []).forEach(attr => {
+                if (attr.name === 'type') {
+                    obj.type = attr.value;
+                } else if (attr.name === 'Descriptor') {
+                    obj.Descriptor = attr.value;
+                } else {
+                    obj[attr.name] = attr.value;
+                }
+            });
 
-        if (obj.hasOwnProperty(childName)) {
-          if (!Array.isArray(obj[childName])) {
-            obj[childName] = [obj[childName]];
-          }
-          obj[childName].push(childJson);
-        } else {
-          obj[childName] = childJson;
+            // Handle child nodes
+            let hasChildren = false;
+            let textContent = '';
+            let children = {};
+
+            Array.from(node.childNodes).forEach(child => {
+                if (child.nodeType === 3) { // Text node
+                    let text = child.nodeValue.trim();
+                    if (text) {
+                        textContent = text;
+                    }
+                } else if (child.nodeType === 1) { // Element node
+                    hasChildren = true;
+                    let childJson = xmlToJson(child);
+                    let nodeName = child.nodeName;
+
+                    if (children[nodeName]) {
+                        if (!Array.isArray(children[nodeName])) {
+                            children[nodeName] = [children[nodeName]];
+                        }
+                        children[nodeName].push(childJson);
+                    } else {
+                        children[nodeName] = childJson;
+                    }
+                }
+            });
+
+            // Combine all parts
+            if (hasChildren) {
+                Object.assign(obj, children);
+            }
+
+            // Handle text content
+            if (textContent && Object.keys(obj).length > 0) {
+                obj.content = textContent;
+            } else if (textContent) {
+                return textContent;
+            }
+
+            // Special handling for ID nodes
+            if (node.nodeName === 'ID' && obj.type) {
+                return {
+                    type: obj.type,
+                    content: obj.content || textContent
+                };
+            }
+
+            return obj;
         }
-      });
 
-      return obj;
-    }
+        function showError(message) {
+            const errorElement = document.getElementById('error');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
 
-    function convertXMLToJSONString(xml, removeNameSpace) {
-      let newXML = xml;
-      if (removeNameSpace) {
-        newXML = removeXMLNameSpace(xml);
-      }
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(newXML, "text/xml");
-      const jsObj = xmlToJson(xmlDoc.documentElement);
-      return JSON.stringify(jsObj, null, 2);
-    }
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
 
-    function process() {
-      const xmlInput = document.getElementById("xmlInput").value;
-      const jsonOutput = convertXMLToJSONString(xmlInput, true);
-      document.getElementById("jsonOutput").value = jsonOutput;
-    }
-  </script>
+        function convertToJSON() {
+            hideError();
+            const xmlInput = document.getElementById('xmlInput').value;
+            const outputContainer = document.getElementById('outputContainer');
+            const jsonOutput = document.getElementById('jsonOutput');
+
+            try {
+                if (!xmlInput.trim()) {
+                    throw new Error('Please enter XML input');
+                }
+
+                const xmlWithoutNs = removeNamespaces(xmlInput);
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlWithoutNs, "text/xml");
+
+                if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+                    throw new Error('Invalid XML format. Please check your input.');
+                }
+
+                const jsonObj = xmlToJson(xmlDoc.documentElement);
+                jsonOutput.textContent = JSON.stringify(jsonObj, null, 2);
+                outputContainer.style.display = 'block';
+            } catch (err) {
+                showError(err.message);
+                outputContainer.style.display = 'none';
+            }
+        }
+
+        function clearAll() {
+            document.getElementById('xmlInput').value = '';
+            document.getElementById('jsonOutput').textContent = '';
+            document.getElementById('outputContainer').style.display = 'none';
+            hideError();
+        }
+    </script>
 </body>
 </html>
