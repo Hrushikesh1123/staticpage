@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>XML to JSON Converter</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea { width: 100%; }
+    button { padding: 10px 20px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>XML to JSON Converter</h1>
+  <p>Paste your XML below:</p>
+  <textarea id="xmlInput" rows="10" placeholder="Paste your XML here"></textarea><br>
+  <button onclick="process()">Convert</button>
+  <h2>JSON Output:</h2>
+  <textarea id="jsonOutput" rows="10" readonly placeholder="JSON output will appear here"></textarea>
+
+  <script>
+    // XSLT content to remove XML namespaces
+    const REMOVE_NS_XSLT_CONTENT = `<?xml version="1.0" encoding="UTF-8"?>
+      <xsl:stylesheet version="1.0" 
+        xmlns:xsl="http://www.w3.org/1999/XSL/Transform" 
+        exclude-result-prefixes="xsl">
+        <xsl:template match="*">
+          <xsl:element name="{local-name()}">
+            <xsl:apply-templates select="@* | node()"/>
+          </xsl:element>
+        </xsl:template>
+        <xsl:template match="@*">
+          <xsl:attribute name="{local-name()}">
+            <xsl:value-of select="."/>
+          </xsl:attribute>
+        </xsl:template>
+        <xsl:template match="text() | comment() | processing-instruction()">
+          <xsl:copy/>
+        </xsl:template>
+      </xsl:stylesheet>`;
+
+    function removeXMLNameSpace(xmlData) {
+      try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlData, "text/xml");
+        const xsltProcessor = new XSLTProcessor();
+        const xsltDoc = parser.parseFromString(REMOVE_NS_XSLT_CONTENT, "text/xml");
+        xsltProcessor.importStylesheet(xsltDoc);
+        const resultDoc = xsltProcessor.transformToDocument(xmlDoc);
+        const serializer = new XMLSerializer();
+        return serializer.serializeToString(resultDoc);
+      } catch (e) {
+        console.error(e);
+      }
+      return xmlData;
+    }
+
+    function xmlToJson(xml) {
+      // Convert an XML DOM to a JavaScript object.
+      let obj = {};
+
+      if (xml.nodeType === 1) { // Element node
+        // Process attributes
+        if (xml.attributes.length > 0) {
+          obj["@attributes"] = {};
+          for (let j = 0; j < xml.attributes.length; j++) {
+            const attribute = xml.attributes.item(j);
+            obj["@attributes"][attribute.nodeName] = attribute.nodeValue;
+          }
+        }
+      } else if (xml.nodeType === 3) { // Text node
+        return xml.nodeValue;
+      }
+
+      // Process child nodes
+      if (xml.hasChildNodes()) {
+        for (let i = 0; i < xml.childNodes.length; i++) {
+          const item = xml.childNodes.item(i);
+          const nodeName = item.nodeName;
+          const childObj = xmlToJson(item);
+          // Skip empty text nodes (like newlines)
+          if (typeof childObj === 'string' && childObj.trim() === "") {
+            continue;
+          }
+
+          if (typeof(obj[nodeName]) === "undefined") {
+            obj[nodeName] = childObj;
+          } else {
+            // Convert to array if multiple children of same name
+            if (!Array.isArray(obj[nodeName])) {
+              obj[nodeName] = [obj[nodeName]];
+            }
+            obj[nodeName].push(childObj);
+          }
+        }
+      }
+      return obj;
+    }
+
+    function convertXMLToJSONString(xml, removeNameSpace) {
+      let newXML = xml;
+      if (removeNameSpace) {
+        newXML = removeXMLNameSpace(xml);
+      }
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(newXML, "text/xml");
+      const jsObj = xmlToJson(xmlDoc);
+      const jsonString = JSON.stringify(jsObj, null, 2);
+      return jsonString;
+    }
+
+    function process() {
+      const xmlInput = document.getElementById("xmlInput").value;
+      const jsonOutput = convertXMLToJSONString(xmlInput, true);
+      document.getElementById("jsonOutput").value = jsonOutput;
+    }
+  </script>
+</body>
+</html>
